@@ -91,13 +91,13 @@ app.put("/profile/:id", (req, res)=>{
 // Posting Fuel Quote to Database
 app.post("/fuel-quote/:id", (req, res)=>{
     const { id } = req.params;
-    const { gallons, address, state, deliveryDate } = req.body;
+    const { gallons, deliveryAddress, state, deliveryDate } = req.body;
     const gallonsRequested = parseInt(gallons); // Parse gallonsRequested as a number
     const pricePerGallon = 2.5;
     const totalPrice = pricePerGallon * gallonsRequested;
   
     const q = 'INSERT INTO quote (userID, gallons, address, state, date, pricePerGallon, totalPrice) VALUES (?, ?, ?, ?, ?, ?, ?)';
-    const values = [id, gallonsRequested, address, state, deliveryDate, pricePerGallon, totalPrice];
+    const values = [id, gallonsRequested, deliveryAddress, state, deliveryDate, pricePerGallon, totalPrice];
     db.query(q, values, (err, result) => {
       if (err) {
         console.error('Error adding fuel quote to database:', err);
@@ -109,7 +109,7 @@ app.post("/fuel-quote/:id", (req, res)=>{
 });
   
   // Fetching Quote History from Database
-  app.get("/fuel-quote/:id", (req, res)=>{
+  app.get("/fuel-quote/:id", (req, res) => {
     const { id } = req.params;
     const userID = parseInt(id);
   
