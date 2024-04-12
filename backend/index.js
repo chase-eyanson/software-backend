@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import mysql from 'mysql';
+import bcrypt from 'bcrypt';
 
 const app = express();
 
@@ -23,18 +24,23 @@ db.connect(err => {
 });
 
 // Login Module
-app.post("/login", (req, res) => {
+app.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
-    const q = 'SELECT * FROM user WHERE email = ? AND password = ?';
-    db.query(q, [email, password], (err, results) => {
+    const q = 'SELECT * FROM user WHERE email = ?';
+    db.query(q, [email], async (err, results) => {
         if (err) {
             res.status(500).json({ success: false, message: "Database error" });
             return;
         }
-        const user = results[0]; // Assuming email and password combination is unique
+        const user = results[0];
         if (user) {
-            res.json({ success: true, message: "Login successful", user });
+            const match = await bcrypt.compare(password, user.password);
+            if (match) {
+                res.json({ success: true, message: "Login successful", user });
+            } else {
+                res.status(401).json({ success: false, message: "Invalid email or password" });
+            }
         } else {
             res.status(401).json({ success: false, message: "Invalid email or password" });
         }
@@ -42,21 +48,27 @@ app.post("/login", (req, res) => {
 });
 
 // Registration
-app.post("/register", (req, res)=>{
+app.post("/register", async (req, res)=>{
     const { email, password, confirmPassword } = req.body;
     if (password !== confirmPassword) {
         res.status(400).json({ success: false, message: "Passwords do not match" });
     } else {
-        const q = 'INSERT INTO user (email, password) VALUES (?, ?)';
-        const values = [email, password]; // Assuming other fields have default values or can be null
-        db.query(q, values, (err, result) => {
-            if (err) {
-                console.error('Error registering user:', err);
-                res.status(500).json({ success: false, message: "Error registering user" });
-                return;
-            }
-            res.json({ success: true, message: "Registration successful" });
-        });
+        try {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const q = 'INSERT INTO user (email, password) VALUES (?, ?)';
+            const values = [email, hashedPassword];
+            db.query(q, values, (err, result) => {
+                if (err) {
+                    console.error('Error registering user:', err);
+                    res.status(500).json({ success: false, message: "Error registering user" });
+                    return;
+                }
+                res.json({ success: true, message: "Registration successful" });
+            });
+        } catch (error) {
+            console.error('Error hashing password:', error);
+            res.status(500).json({ success: false, message: "Error hashing password" });
+        }
     }
 });
 
