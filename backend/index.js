@@ -1,97 +1,116 @@
 import express from 'express';
 import cors from 'cors';
+import mysql from 'mysql';
 
 const app = express();
 
 app.use(express.json());
 app.use(cors());
 
-// Set up users such that each user has username, password, first name, last name, address, city, and zip code
-let users = [
-    { username: "user1", password: "pass1", firstName: "John", lastName: "Doe", address: "123 Main St", city: "Houston", zipCode: "77001" },
-    { username: "user2", password: "pass2", firstName: "Jane", lastName: "Smith", address: "456 Elm St", city: "Austin", zipCode: "78701" }
-];
+const db = mysql.createConnection({
+    host: "swdserver.mysql.database.azure.com",
+    user: "adminuser",
+    password: "pass12!@",
+    database: "oildb"
+});
 
-// Set up quoteHistory to contain an array of objects, each representing a fuel quote
-let quoteHistory = [
-    {
-        userId: 0,
-        quotes: [
-            { gallonsRequested: 100, price: 250, date: "2024-03-28", deliveryAddress: "123 Main St", deliveryDate: "2024-04-05" }
-        ]
-    },
-    {
-        userId: 1,
-        quotes: [
-            { gallonsRequested: 150, price: 375, date: "2024-03-27", deliveryAddress: "456 Elm St", deliveryDate: "2024-04-10" }
-        ]
+db.connect(err => {
+    if (err) {
+        console.error('Database connection failed:', err);
+        return;
     }
-];
+    console.log('Connected to the database.');
+});
 
 // Login Module
-app.get("/login", (req, res)=>{
-    const { username, password } = req.query;
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-        res.json({ success: true, message: "Login successful", user });
-    } else {
-        res.status(401).json({ success: false, message: "Invalid username or password" });
-    }
+app.post("/login", (req, res) => {
+    const { email, password } = req.body;
+
+    const q = 'SELECT * FROM user WHERE email = ? AND password = ?';
+    db.query(q, [email, password], (err, results) => {
+        if (err) {
+            res.status(500).json({ success: false, message: "Database error" });
+            return;
+        }
+        const user = results[0]; // Assuming email and password combination is unique
+        if (user) {
+            res.json({ success: true, message: "Login successful", user });
+        } else {
+            res.status(401).json({ success: false, message: "Invalid email or password" });
+        }
+    });
 });
 
 // Registration
 app.post("/register", (req, res)=>{
-    const { username, password, confirmPassword } = req.body;
+    const { email, password, confirmPassword } = req.body;
     if (password !== confirmPassword) {
         res.status(400).json({ success: false, message: "Passwords do not match" });
     } else {
-        users.push({ username, password, firstName: "", lastName: "", address: "", city: "", zipCode: "" });
-        res.json({ success: true, message: "Registration successful" });
+        const q = 'INSERT INTO user (email, password) VALUES (?, ?)';
+        const values = [email, password]; // Assuming other fields have default values or can be null
+        db.query(q, values, (err, result) => {
+            if (err) {
+                console.error('Error registering user:', err);
+                res.status(500).json({ success: false, message: "Error registering user" });
+                return;
+            }
+            res.json({ success: true, message: "Registration successful" });
+        });
     }
 });
 
 // Profile Management Module
 app.put("/profile/:id", (req, res)=>{
     const { id } = req.params;
-    const { firstName, lastName, address, city, zipCode } = req.body;
-    if (users[id]) {
-        users[id] = { ...users[id], firstName, lastName, address, city, zipCode };
+    const { fullName, address, city, zipCode, state } = req.body;
+    const q = 'UPDATE user SET name=?, address=?, city=?, zipcode=?, state=? WHERE userID=?';
+    const values = [fullName, address, city, zipCode, state, id];
+    db.query(q, values, (err, result) => {
+        if (err) {
+            console.error('Error updating profile:', err);
+            res.status(500).json({ success: false, message: "Error updating profile" });
+            return;
+        }
         res.json({ success: true, message: "Profile updated successfully" });
-    } else {
-        res.status(404).json({ success: false, message: "User not found" });
-    }
+    });
 });
 
-// Fuel Quote Module
+// Posting Fuel Quote to Database
 app.post("/fuel-quote/:id", (req, res)=>{
     const { id } = req.params;
-    const { gallonsRequested, deliveryAddress, deliveryDate } = req.body;
-    const price = 2.5 * gallonsRequested;
-    
-    const userIndex = parseInt(id);
-    if (userIndex >= 0 && userIndex < users.length) {
-        quoteHistory[userIndex].quotes.push({
-            gallonsRequested,
-            price,
-            date: new Date().toISOString().split('T')[0],
-            deliveryAddress,
-            deliveryDate
-        });
-        res.json({ success: true, message: "Fuel quote added successfully" });
-    } else {
-        res.status(404).json({ success: false, message: "User not found" });
-    }
+    const { gallons, address, state, deliveryDate } = req.body;
+    const gallonsRequested = parseInt(gallons); // Parse gallonsRequested as a number
+    const pricePerGallon = 2.5;
+    const totalPrice = pricePerGallon * gallonsRequested;
+  
+    const q = 'INSERT INTO quote (userID, gallons, address, state, date, pricePerGallon, totalPrice) VALUES (?, ?, ?, ?, ?, ?, ?)';
+    const values = [id, gallonsRequested, address, state, deliveryDate, pricePerGallon, totalPrice];
+    db.query(q, values, (err, result) => {
+      if (err) {
+        console.error('Error adding fuel quote to database:', err);
+        res.status(500).json({ success: false, message: "Error adding fuel quote to database" });
+        return;
+      }
+      res.json({ success: true, message: "Fuel quote added successfully" });
+    });
 });
-
-app.get("/fuel-quote/:id", (req, res)=>{
+  
+  // Fetching Quote History from Database
+  app.get("/fuel-quote/:id", (req, res)=>{
     const { id } = req.params;
-    const userIndex = parseInt(id);
-    if (userIndex >= 0 && userIndex < quoteHistory.length) {
-        res.json({ success: true, userQuotes: quoteHistory[userIndex].quotes });
-    } else {
-        res.status(404).json({ success: false, message: "User not found" });
-    }
-});
+    const userID = parseInt(id);
+  
+    const q = 'SELECT gallons, address, date, pricePerGallon, totalPrice FROM quote WHERE userID = ? ORDER BY date DESC';
+    db.query(q, [userID], (err, results) => {
+      if (err) {
+        console.error('Error fetching fuel quote history from database:', err);
+        res.status(500).json({ success: false, message: "Error fetching fuel quote history from database" });
+        return;
+      }
+      res.json({ success: true, userQuotes: results });
+    });
+  });
 
 // Pricing Module
 class PricingModule {
