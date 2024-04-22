@@ -146,9 +146,7 @@ app.get("/fuel-quote/:id", (req, res) => {
 });
 
 
-//LARRY New Code Here
 // Pricing Module
-
 app.post("/calculate-price", (req, res) => {
     const { gallonsRequested, state, hasHistory } = req.body;
 
