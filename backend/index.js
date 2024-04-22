@@ -88,6 +88,7 @@ app.put("/profile/:id", (req, res)=>{
     });
 });
 
+// MAX New Code Here
 // Posting Fuel Quote to Database
 app.post("/fuel-quote/:id", (req, res)=>{
     const { id } = req.params;
@@ -107,7 +108,8 @@ app.post("/fuel-quote/:id", (req, res)=>{
       res.json({ success: true, message: "Fuel quote added successfully" });
     });
 });
-  
+
+// MAX New Code Here
   // Fetching Quote History from Database
   app.get("/fuel-quote/:id", (req, res) => {
     const { id } = req.params;
@@ -124,6 +126,7 @@ app.post("/fuel-quote/:id", (req, res)=>{
     });
   });
 
+//LARRY New Code Here
 // Pricing Module
 class PricingModule {
     static calculatePrice(gallonsRequested) {
