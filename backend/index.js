@@ -88,43 +88,63 @@ app.put("/profile/:id", (req, res)=>{
     });
 });
 
-// MAX New Code Here
 // Posting Fuel Quote to Database
-app.post("/fuel-quote/:id", (req, res)=>{
+app.post("/fuel-quote/:id", async (req, res)=>{
     const { id } = req.params;
     const { gallons, deliveryAddress, state, deliveryDate } = req.body;
     const gallonsRequested = parseInt(gallons); // Parse gallonsRequested as a number
-    const pricePerGallon = 2.5;
-    const totalPrice = pricePerGallon * gallonsRequested;
-  
-    const q = 'INSERT INTO quote (userID, gallons, address, state, date, pricePerGallon, totalPrice) VALUES (?, ?, ?, ?, ?, ?, ?)';
-    const values = [id, gallonsRequested, deliveryAddress, state, deliveryDate, pricePerGallon, totalPrice];
-    db.query(q, values, (err, result) => {
-      if (err) {
-        console.error('Error adding fuel quote to database:', err);
+
+    try {
+        const hasHistory = await checkFuelQuoteHistory(id);
+        const { suggestedPricePerGallon, totalPrice } = PricingModule.calculatePrice(gallonsRequested, state, hasHistory);
+
+        const q = 'INSERT INTO quote (userID, gallons, address, state, date, pricePerGallon, totalPrice) VALUES (?, ?, ?, ?, ?, ?, ?)';
+        const values = [id, gallonsRequested, deliveryAddress, state, deliveryDate, suggestedPricePerGallon, totalPrice];
+        
+        db.query(q, values, (err, result) => {
+            if (err) {
+                console.error('Error adding fuel quote to database:', err);
+                res.status(500).json({ success: false, message: "Error adding fuel quote to database" });
+                return;
+            }
+            res.json({ success: true, message: "Fuel quote added successfully" });
+        });
+    } catch (error) {
+        console.error('Error checking fuel quote history:', error);
         res.status(500).json({ success: false, message: "Error adding fuel quote to database" });
-        return;
-      }
-      res.json({ success: true, message: "Fuel quote added successfully" });
-    });
+    }
 });
 
-// MAX New Code Here
+// Helper function to check if fuel quote history exists
+async function checkFuelQuoteHistory(userID) {
+    return new Promise((resolve, reject) => {
+        const q = 'SELECT COUNT(*) AS count FROM quote WHERE userID = ?';
+        db.query(q, [userID], (err, results) => {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(results[0].count > 0);
+        });
+    });
+}
+
   // Fetching Quote History from Database
-  app.get("/fuel-quote/:id", (req, res) => {
+app.get("/fuel-quote/:id", (req, res) => {
     const { id } = req.params;
     const userID = parseInt(id);
   
     const q = 'SELECT gallons, address, date, pricePerGallon, totalPrice FROM quote WHERE userID = ? ORDER BY date DESC';
     db.query(q, [userID], (err, results) => {
-      if (err) {
-        console.error('Error fetching fuel quote history from database:', err);
-        res.status(500).json({ success: false, message: "Error fetching fuel quote history from database" });
-        return;
-      }
-      res.json({ success: true, userQuotes: results });
+        if (err) {
+            console.error('Error fetching fuel quote history from database:', err);
+            res.status(500).json({ success: false, message: "Error fetching fuel quote history from database" });
+            return;
+        }
+        res.json({ success: true, userQuotes: results });
     });
-  });
+});
+
 
 //LARRY New Code Here
 // Pricing Module
