@@ -148,11 +148,38 @@ app.get("/fuel-quote/:id", (req, res) => {
 
 //LARRY New Code Here
 // Pricing Module
+
+app.post("/calculate-price", (req, res) => {
+    const { gallonsRequested, state, hasHistory } = req.body;
+
+    try {
+        const totalPrice = PricingModule.calculatePrice(gallonsRequested, state, hasHistory).totalPrice;
+        res.json({ success: true, totalPrice });
+    } catch (error) {
+        console.error("Error calculating price:", error);
+        res.status(500).json({ success: false, message: "Error calculating price" });
+    }
+});
+
 class PricingModule {
-    static calculatePrice(gallonsRequested) {
-        return 2.5 * gallonsRequested;
+    static calculatePrice(gallonsRequested, state, hasHistory) {
+        const currentPrice = 1.50;
+        const locationFactor = state === 'TX' ? 0.02 : 0.04;
+        const rateHistoryFactor = hasHistory ? 0.01 : 0;
+        const gallonsRequestedFactor = gallonsRequested > 1000 ? 0.02 : 0.03;
+        const companyProfitFactor = 0.10;
+
+        const margin = (locationFactor - rateHistoryFactor + gallonsRequestedFactor + companyProfitFactor) * currentPrice;
+        const suggestedPricePerGallon = currentPrice + margin;
+        const totalPrice = suggestedPricePerGallon * gallonsRequested;
+
+        return {
+            suggestedPricePerGallon,
+            totalPrice
+        };
     }
 }
+
 
 app.listen(80, ()=>{
     console.log("Connected to the backend!");
