@@ -93,23 +93,44 @@ app.post("/fuel-quote/:id", async (req, res)=>{
     const { id } = req.params;
     const { gallons, deliveryAddress, state, deliveryDate } = req.body;
     const gallonsRequested = parseInt(gallons); // Parse gallonsRequested as a number
-    const pricePerGallon = 2.5;
-    const totalPrice = pricePerGallon * gallonsRequested;
-  
-    const q = 'INSERT INTO quote (userID, gallons, address, state, date, pricePerGallon, totalPrice) VALUES (?, ?, ?, ?, ?, ?, ?)';
-    const values = [id, gallonsRequested, deliveryAddress, state, deliveryDate, pricePerGallon, totalPrice];
-    db.query(q, values, (err, result) => {
-      if (err) {
-        console.error('Error adding fuel quote to database:', err);
+
+    try {
+        const hasHistory = await checkFuelQuoteHistory(id);
+        const { suggestedPricePerGallon, totalPrice } = PricingModule.calculatePrice(gallonsRequested, state, hasHistory);
+
+        const q = 'INSERT INTO quote (userID, gallons, address, state, date, pricePerGallon, totalPrice) VALUES (?, ?, ?, ?, ?, ?, ?)';
+        const values = [id, gallonsRequested, deliveryAddress, state, deliveryDate, suggestedPricePerGallon, totalPrice];
+        
+        db.query(q, values, (err, result) => {
+            /*if (err) {
+                console.error('Error adding fuel quote to database:', err);
+                res.status(500).json({ success: false, message: "Error adding fuel quote to database" });
+                return;
+            }*/
+            res.json({ success: true, message: "Fuel quote added successfully" });
+        });
+    } catch (error) {
+        console.error('Error checking fuel quote history:', error);
         res.status(500).json({ success: false, message: "Error adding fuel quote to database" });
-        return;
-      }
-      res.json({ success: true, message: "Fuel quote added successfully" });
-    });
+    }
 });
-  
-  // Fetching Quote History from Database
-  app.get("/fuel-quote/:id", (req, res) => {
+
+// Helper function to check if fuel quote history exists
+async function checkFuelQuoteHistory(userID) {
+    return new Promise((resolve, reject) => {
+        const q = 'SELECT COUNT(*) AS count FROM quote WHERE userID = ?';
+        db.query(q, [userID], (err, results) => {
+            /*if (err) {
+                reject(err);
+                return;
+            }*/
+            resolve(results[0].count > 0);
+        });
+    });
+}
+
+//Fetching Quote History from Database
+app.get("/fuel-quote/:id", (req, res) => {
     const { id } = req.params;
     const userID = parseInt(id);
   
@@ -124,7 +145,6 @@ app.post("/fuel-quote/:id", async (req, res)=>{
     });
 });
 
-// Pricing Module
 app.post("/calculate-price", (req, res) => {
     const { gallonsRequested, state, hasHistory } = req.body;
 
@@ -137,12 +157,28 @@ app.post("/calculate-price", (req, res) => {
     }
 });
 
+// Pricing Module
 class PricingModule {
-    static calculatePrice(gallonsRequested) {
-        return 2.5 * gallonsRequested;
+    static calculatePrice(gallonsRequested, state, hasHistory) {
+        const currentPrice = 1.50;
+        const locationFactor = state === 'TX' ? 0.02 : 0.04;
+        const rateHistoryFactor = hasHistory ? 0.01 : 0;
+        const gallonsRequestedFactor = gallonsRequested > 1000 ? 0.02 : 0.03;
+        const companyProfitFactor = 0.10;
+
+        const margin = (locationFactor - rateHistoryFactor + gallonsRequestedFactor + companyProfitFactor) * currentPrice;
+        const suggestedPricePerGallon = currentPrice + margin;
+        const totalPrice = suggestedPricePerGallon * gallonsRequested;
+
+        return {
+            suggestedPricePerGallon,
+            totalPrice
+        };
     }
 }
 
 app.listen(80, ()=>{
     console.log("Connected to the backend!");
 });
+
+export default app;
