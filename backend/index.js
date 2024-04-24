@@ -136,11 +136,11 @@ app.get("/fuel-quote/:id", (req, res) => {
   
     const q = 'SELECT gallons, address, date, pricePerGallon, totalPrice FROM quote WHERE userID = ? ORDER BY date DESC';
     db.query(q, [userID], (err, results) => {
-        if (err) {
+        /*if (err) {
             console.error('Error fetching fuel quote history from database:', err);
             res.status(500).json({ success: false, message: "Error fetching fuel quote history from database" });
             return;
-        }
+        }*/
         res.json({ success: true, userQuotes: results });
     });
 });
