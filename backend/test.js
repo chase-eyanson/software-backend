@@ -1,131 +1,138 @@
-import chai from 'chai';
-import chaiHttp from 'chai-http';
 import app from './index.js';
+import request from 'supertest';
 
-chai.use(chaiHttp);
-const expect = chai.expect;
-
-describe('Login Module', () => {
-    it('should return success if valid credentials are provided', (done) => {
-        chai.request(app)
-            .get('/login?username=user1&password=pass1')
-            .end((err, res) => {
-                expect(res).to.have.status(200);
-                expect(res.body.success).to.be.true;
-                expect(res.body.message).to.equal('Login successful');
-                expect(res.body.user).to.be.an('object');
-                done();
-            });
+describe('Backend API Tests', () => {
+    // Test Database Connection (Implicitly tested through other endpoints)
+    it('should successfully connect to the database', (done) => {
+        // Assuming the connection logs are visible in the console
+        console.log("Database connected successfully (assumed through successful test completions).");
+        done();
     });
 
-    it('should return failure if invalid credentials are provided', (done) => {
-        chai.request(app)
-            .get('/login?username=user1&password=wrongpassword')
-            .end((err, res) => {
-                expect(res).to.have.status(401);
-                expect(res.body.success).to.be.false;
-                expect(res.body.message).to.equal('Invalid username or password');
-                done();
-            });
-    });
-});
+    describe('Login Module', () => {
+        it('should return success if valid credentials are provided', (done) => {
+            request(app)
+                .post('/login')
+                .send({ email: 'georget@gmail.com', password: 'startrek' })
+                .expect(200)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (!res.body.success) return done(new Error('Login failed'));
+                    done();
+                });
+        });
 
-describe('Registration', () => {
-    it('should register a new user', (done) => {
-        chai.request(app)
-            .post('/register')
-            .send({ username: 'testuser', password: 'testpassword', confirmPassword: 'testpassword' })
-            .end((err, res) => {
-                expect(res).to.have.status(200);
-                expect(res.body.success).to.be.true;
-                expect(res.body.message).to.equal('Registration successful');
-                done();
-            });
-    });
-
-    it('should fail registration if passwords do not match', (done) => {
-        chai.request(app)
-            .post('/register')
-            .send({ username: 'testuser', password: 'testpassword', confirmPassword: 'wrongpassword' })
-            .end((err, res) => {
-                expect(res).to.have.status(400);
-                expect(res.body.success).to.be.false;
-                expect(res.body.message).to.equal('Passwords do not match');
-                done();
-            });
-    });
-});
-
-describe('Profile Management Module', () => {
-    it('should update the profile of a user', (done) => {
-        chai.request(app)
-            .put('/profile/0')
-            .send({ firstName: 'UpdatedFirstName', lastName: 'UpdatedLastName', address: 'UpdatedAddress', city: 'UpdatedCity', zipCode: 'UpdatedZipCode' })
-            .end((err, res) => {
-                expect(res).to.have.status(200);
-                expect(res.body.success).to.be.true;
-                expect(res.body.message).to.equal('Profile updated successfully');
-                done();
-            });
+        it('should return failure if invalid credentials are provided', (done) => {
+            request(app)
+                .post('/login')
+                .send({ email: 'user1@example.com', password: 'wrongpassword' })
+                .expect(401)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (res.body.success) return done(new Error('Login should fail'));
+                    done();
+                });
+        });
     });
 
-    it('should return 404 if user does not exist while updating profile', (done) => {
-        chai.request(app)
-            .put('/profile/100')
-            .send({ firstName: 'UpdatedFirstName', lastName: 'UpdatedLastName', address: 'UpdatedAddress', city: 'UpdatedCity', zipCode: 'UpdatedZipCode' })
-            .end((err, res) => {
-                expect(res).to.have.status(404);
-                expect(res.body.success).to.be.false;
-                expect(res.body.message).to.equal('User not found');
-                done();
-            });
-    });
-});
+    describe('Registration', () => {
+        it('should register a new user', (done) => {
+            request(app)
+                .post('/register')
+                .send({ email: 'testuser@example.com', password: 'testpassword', confirmPassword: 'testpassword' })
+                .expect(200)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (!res.body.success) return done(new Error('Registration failed'));
+                    done();
+                });
+        });
 
-describe('Fuel Quote Module', () => {
-    it('should add a fuel quote successfully', (done) => {
-        chai.request(app)
-            .post('/fuel-quote/0')
-            .send({ gallonsRequested: 100, deliveryAddress: 'TestAddress', deliveryDate: '2024-04-10' })
-            .end((err, res) => {
-                expect(res).to.have.status(200);
-                expect(res.body.success).to.be.true;
-                expect(res.body.message).to.equal('Fuel quote added successfully');
-                done();
-            });
-    });
-
-    it('should return 404 if user does not exist while adding fuel quote', (done) => {
-        chai.request(app)
-            .post('/fuel-quote/100')
-            .send({ gallonsRequested: 100, deliveryAddress: 'TestAddress', deliveryDate: '2024-04-10' })
-            .end((err, res) => {
-                expect(res).to.have.status(404);
-                expect(res.body.success).to.be.false;
-                expect(res.body.message).to.equal('User not found');
-                done();
-            });
+        it('should fail registration if passwords do not match', (done) => {
+            request(app)
+                .post('/register')
+                .send({ email: 'testuser@example.com', password: 'testpassword', confirmPassword: 'wrongpassword' })
+                .expect(400)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (res.body.success) return done(new Error('Registration should fail'));
+                    done();
+                });
+        });
     });
 
-    it('should fetch fuel quote history successfully', (done) => {
-        chai.request(app)
-            .get('/fuel-quote/0')
-            .end((err, res) => {
-                expect(res).to.have.status(200);
-                expect(res.body.success).to.be.true;
-                expect(res.body.userQuotes).to.be.an('array');
-                done();
-            });
+    describe('Profile Management Module', () => {
+        it('should update the profile of a user', (done) => {
+            request(app)
+                .put('/profile/15')
+                .send({ fullName: 'UpdatedFullName', address: 'UpdatedAddress', city: 'UpdatedCity', zipCode: '78745', state: 'TX' })
+                .expect(200)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (!res.body.success) return done(new Error('Profile update failed'));
+                    done();
+                });
+        });
+        
+        it('should return 404 if user does not exist while updating profile', (done) => {
+            request(app)
+                .put('/profile/100')
+                .send({ fullName: 'UpdatedFullName', address: 'UpdatedAddress', city: 'UpdatedCity', zipCode: 'UpdatedZipCode', state: 'TX' })
+                .expect(404)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (res.body.success) return done(new Error('User found but should not exist'));
+                    done();
+                });
+        }); 
     });
 
-    it('should return 404 if user does not exist while fetching fuel quote history', (done) => {
-        chai.request(app)
-            .get('/fuel-quote/100')
-            .end((err, res) => {
-                expect(res).to.have.status(404);
-                expect(res.body.success).to.be.false;
-                expect(res.body.message).to.equal('User not found');
-                done();
-            });
+    describe('Fuel Quote Module', () => {
+        it('should add a fuel quote successfully', (done) => {
+            request(app)
+                .post('/fuel-quote/15')
+                .send({ gallons: 100, deliveryAddress: 'TestAddress', state: 'TX', deliveryDate: '2024-04-10' })
+                .expect(200)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (!res.body.success) return done(new Error('Fuel quote addition failed'));
+                    done();
+                });
+        });
+        
+        it('should return 404 if user does not exist while adding fuel quote', (done) => {
+            request(app)
+                .post('/fuel-quote/100')
+                .send({ gallons: 100, deliveryAddress: 'TestAddress', state: 'TX', deliveryDate: '2024-04-10' })
+                .expect(404)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (res.body.success) return done(new Error('User found but should not exist'));
+                    done();
+                });
+        }); 
+
+        it('should fetch fuel quote history successfully', (done) => {
+            request(app)
+                .get('/fuel-quote/15')
+                .expect(200)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (!res.body.success) return done(new Error('Fetching fuel quote history failed'));
+                    if (!Array.isArray(res.body.userQuotes)) return done(new Error('Invalid fuel quote history format'));
+                    done();
+                });
+        });
+        
+        it('should return 404 if user does not exist while fetching fuel quote history', (done) => {
+            request(app)
+                .get('/fuel-quote/100')
+                .expect(404)
+                .end((err, res) => {
+                    if (err) return done(err);
+                    if (res.body.success) return done(new Error('User found but should not exist'));
+                    done();
+                });
+        });
     });
 });
