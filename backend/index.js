@@ -29,10 +29,10 @@ app.post("/login", async (req, res) => {
 
     const q = 'SELECT * FROM user WHERE email = ?';
     db.query(q, [email], async (err, results) => {
-        if (err) {
+        /*if (err) {
             res.status(500).json({ success: false, message: "Database error" });
             return;
-        }
+        }*/
         const user = results[0];
         if (user) {
             const match = await bcrypt.compare(password, user.password);
@@ -85,6 +85,20 @@ app.put("/profile/:id", (req, res)=>{
             return;
         }*/
         res.json({ success: true, message: "Profile updated successfully" });
+    });
+});
+
+app.get("/profile/:id", (req, res) => {
+    const { id } = req.params;
+    const q = 'SELECT name, address, city, zipcode, state FROM user WHERE userID = ?';
+
+    db.query(q, [id], (err, results) => {
+        if (results.length === 0) {
+            res.status(404).json({ success: false, message: "User not found" });
+        } else {
+            const userProfile = results[0];
+            res.json({ success: true, userProfile });
+        }
     });
 });
 
